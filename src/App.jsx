@@ -3,6 +3,43 @@ import Editor from "./components/Editor";
 import Review from "./components/Review";
 import { reviewCode, generateCode } from "./groq";
 
+const COLLAPSE_LIMIT = 300;
+
+function ChatMessage({ msg }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = msg.text.length > COLLAPSE_LIMIT;
+  const displayText = isLong && !expanded ? msg.text.slice(0, COLLAPSE_LIMIT) + "..." : msg.text;
+
+  return (
+    <div style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+      <div style={{
+        maxWidth: "80%", padding: "8px 12px",
+        borderRadius: msg.role === "user" ? "10px 10px 2px 10px" : "10px 10px 10px 2px",
+        background: msg.role === "user" ? "#1e3a5f" : "#1a1a2e",
+        border: msg.role === "user" ? "0.5px solid #2d5f9e" : "0.5px solid #2a2a3e",
+        fontSize: "12px", color: msg.role === "user" ? "#7ab8f5" : "#cc99cd",
+        fontFamily: "monospace", lineHeight: "1.6", whiteSpace: "pre-wrap"
+      }}>
+        {displayText}
+        {isLong && (
+          <div
+            onClick={() => setExpanded(e => !e)}
+            style={{
+              marginTop: "6px", fontSize: "11px",
+              color: msg.role === "user" ? "#4e9eff" : "#8855cc",
+              cursor: "pointer", userSelect: "none",
+              borderTop: "0.5px solid rgba(255,255,255,0.08)",
+              paddingTop: "5px"
+            }}
+          >
+            {expanded ? "▲ collapse" : "▼ show more"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [code, setCode] = useState("");
   const [review, setReview] = useState("");
@@ -10,7 +47,7 @@ function App() {
   const [originalCode, setOriginalCode] = useState("");
   const [language, setLanguage] = useState("javascript");
 
-  const [rightTab, setRightTab] = useState("review"); // "review" | "generate"
+  const [rightTab, setRightTab] = useState("review");
   const [chatMessages, setChatMessages] = useState([
     { role: "ai", text: "Hi! Tell me what code to write.\nExample: \"write a debounce function\" or \"binary search in python\"" }
   ]);
@@ -82,13 +119,12 @@ function App() {
   const themeLabels = { dark: "🌑 dark", light: "☀ light", monokai: "🎨 monokai" };
 
   return (
-    <div style={{ minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "monospace", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", background: t.bg, color: t.text, fontFamily: "monospace", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
       {/* Titlebar */}
       <div style={{ background: t.bar, borderBottom: `0.5px solid ${t.border}`, padding: "0 16px", height: "38px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <span style={{ fontSize: "12px", color: t.muted, letterSpacing: "0.3px" }}>AI Code Reviewer</span>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {/* Copy editor code */}
           <button
             onClick={handleCopyCode}
             disabled={!code.trim()}
@@ -103,7 +139,6 @@ function App() {
           >
             {codeCopied ? "✓ copied" : "⎘ copy code"}
           </button>
-          {/* Theme switcher */}
           <button
             onClick={() => setTheme(th => themeOrder[(themeOrder.indexOf(th) + 1) % themeOrder.length])}
             style={{
@@ -139,9 +174,8 @@ function App() {
             ))}
           </select>
 
-          {/* AI Generate button */}
           <button
-            onClick={() => setRightTab(t => t === "generate" ? "review" : "generate")}
+            onClick={() => setRightTab(rt => rt === "generate" ? "review" : "generate")}
             style={{
               background: rightTab === "generate" ? "#2a1a4a" : "#1a1a2e",
               color: rightTab === "generate" ? "#cc99cd" : "#888",
@@ -179,23 +213,24 @@ function App() {
 
       {/* Main panels */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", flex: 1, minHeight: 0 }}>
+
         {/* Editor panel */}
-        <div style={{ display: "flex", flexDirection: "column", borderRight: "0.5px solid #2a2a2e" }}>
-          <div style={{ background: "#16161d", padding: "6px 14px", borderBottom: "0.5px solid #2a2a2e", display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ display: "flex", flexDirection: "column", borderRight: "0.5px solid #2a2a2e", minHeight: 0 }}>
+          <div style={{ background: "#16161d", padding: "6px 14px", borderBottom: "0.5px solid #2a2a2e", display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
             <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4e9eff" }} />
             <span style={{ fontSize: "11px", color: "#555", textTransform: "uppercase", letterSpacing: "0.5px" }}>editor</span>
             <span style={{ fontSize: "11px", color: "#333", marginLeft: "auto" }}>{language}</span>
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minHeight: 0 }}>
             <Editor code={code} setCode={setCode} language={language} editorTheme={t.editorTheme} />
           </div>
         </div>
 
         {/* Right panel — tabbed */}
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
 
           {/* Tab bar */}
-          <div style={{ background: "#16161d", borderBottom: "0.5px solid #2a2a2e", display: "flex", alignItems: "stretch" }}>
+          <div style={{ background: "#16161d", borderBottom: "0.5px solid #2a2a2e", display: "flex", alignItems: "stretch", flexShrink: 0 }}>
             {[
               { key: "review", label: "▶ AI Review", dot: loading ? "#febc2e" : review ? "#28c840" : "#555", dotColor: loading ? "#febc2e" : review ? "#4ec94e" : "#444", status: loading ? "analyzing..." : review ? "ready" : "waiting" },
               { key: "generate", label: "✦ Generate", dot: "#cc99cd", dotColor: "#cc99cd", status: "chat" },
@@ -223,33 +258,23 @@ function App() {
 
           {/* Review tab */}
           {rightTab === "review" && (
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
               <Review review={review} loading={loading} originalCode={originalCode} />
             </div>
           )}
 
           {/* Generate tab */}
           {rightTab === "generate" && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#0f0f18" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#0f0f18", overflow: "hidden", minHeight: 0 }}>
+
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: "8px", minHeight: 0 }}>
                 {chatMessages.map((msg, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                    <div style={{
-                      maxWidth: "80%", padding: "8px 12px",
-                      borderRadius: msg.role === "user" ? "10px 10px 2px 10px" : "10px 10px 10px 2px",
-                      background: msg.role === "user" ? "#1e3a5f" : "#1a1a2e",
-                      border: msg.role === "user" ? "0.5px solid #2d5f9e" : "0.5px solid #2a2a3e",
-                      fontSize: "12px", color: msg.role === "user" ? "#7ab8f5" : "#cc99cd",
-                      fontFamily: "monospace", lineHeight: "1.6", whiteSpace: "pre-wrap"
-                    }}>
-                      {msg.text}
-                    </div>
-                  </div>
+                  <ChatMessage key={i} msg={msg} />
                 ))}
                 {chatLoading && (
                   <div style={{ display: "flex", gap: "5px", padding: "4px 0" }}>
-                    {[0,1,2].map(i => (
+                    {[0, 1, 2].map(i => (
                       <div key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#8855cc", animation: `bounce 1s ease-in-out ${i * 0.2}s infinite` }} />
                     ))}
                   </div>
@@ -258,7 +283,7 @@ function App() {
               </div>
 
               {/* Input */}
-              <div style={{ padding: "10px 14px", borderTop: "0.5px solid #2a2a2e", display: "flex", gap: "8px", alignItems: "flex-end" }}>
+              <div style={{ padding: "10px 14px", borderTop: "0.5px solid #2a2a2e", display: "flex", gap: "8px", alignItems: "flex-end", flexShrink: 0 }}>
                 <textarea
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
